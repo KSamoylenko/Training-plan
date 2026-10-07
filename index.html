@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Тренировочный дневник</title>
+<style>
+:root{--bg:#e9ebe6;--card:#f6f7f3;--ink:#16191b;--mut:#666d71;--line:#cfd3cc;--ac:#2a46d1;--acx:#fff;--bad:#b3261e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111416;--card:#1a1e21;--ink:#e8ebe6;--mut:#8b9296;--line:#2c3236;--ac:#8196ff;--acx:#0d1020;--bad:#ff8a80}}
+:root[data-theme="dark"]{--bg:#111416;--card:#1a1e21;--ink:#e8ebe6;--mut:#8b9296;--line:#2c3236;--ac:#8196ff;--acx:#0d1020;--bad:#ff8a80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1,h2,h3,nav button,.ttl{font-family:'Arial Narrow','Roboto Condensed',system-ui,sans-serif;font-weight:700}
+h1{font-size:34px;margin:4px 0 8px}h2{font-size:24px;margin:0}h3{font-size:19px;margin:0 0 4px}
+button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);padding:8px 12px;border-radius:8px;cursor:pointer}
+input,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;min-width:0}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+nav button{border:0;background:none;font-size:19px;font-weight:600;color:var(--mut);border-radius:0;padding:8px 10px}
+nav .on{color:var(--ink);box-shadow:inset 0 -3px var(--ac)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:12px 0}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.row input:not([type]),.row input[list],.row select{flex:1;min-width:130px}
+.pri{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:500}
+.x{color:var(--bad);border:0;background:none;padding:6px 8px}
+.ghost{border-style:dashed;margin-top:4px}
+.ttl{font-size:24px;font-weight:700;border:0;background:none;flex:1;padding:0}
+.ex{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.ex .nm{flex:1}.ex input,.n{width:62px}
+.exb{padding:10px 0;border-top:1px solid var(--line)}.exb:first-of-type{border-top:0}
+.sh,.sr{display:grid;grid-template-columns:26px 1fr 1fr 36px;gap:8px;align-items:center;margin:6px 0}
+.sh{color:var(--mut);font-size:12px}
+#st{font-size:13px;margin:-4px 0 8px}.btn{display:inline-block;background:var(--card);border:1px solid var(--line);padding:8px 12px;border-radius:8px;cursor:pointer}p{margin:8px 0}.mut{color:var(--mut)}.ln{padding:3px 0}
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.seg .on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.ch{width:100%;height:auto}.ch text{fill:var(--mut);font-size:13px}.ch .v{fill:var(--ink)}
+.ch .gl{stroke:var(--line)}.ch polyline{fill:none;stroke:var(--ac);stroke-width:2.5}.ch circle{fill:var(--ac)}
+</style>
+</head>
+<body>
+<main><h1>Тренировочный дневник</h1><div id="st" class="mut"></div><div id="app"></div></main>
+<datalist id="sg"><option>Подтягивания</option><option>Отжимания на брусьях</option><option>Отжимания от пола</option><option>Жим гантелей на наклонной скамье</option><option>Жим гири</option><option>Свинг с гирей</option><option>Гоблет-присед с гирей</option><option>Тяга гантели в наклоне</option><option>Сгибание рук с гантелями</option><option>Подъём ног в висе</option></datalist>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const today=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const fd=d=>d.slice(8)+'.'+d.slice(5,7);
+const f1=v=>Math.round(v*10)/10;
+let S={days:[],log:[],del:{}},DR=null,tab='days',selEx='',metric='w',FH=null,FOK=false,tm,dirty=false;
+const st=t=>{$('#st').textContent=t};
+const FS=!!window.showSaveFilePicker;
+const FT={types:[{description:'История тренировок',accept:{'application/json':['.json']}}]};
+const idb=(m,v)=>new Promise((ok,no)=>{const q=indexedDB.open('wl',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onerror=()=>no();q.onsuccess=()=>{const s=q.result.transaction('k',m==='get'?'readonly':'readwrite').objectStore('k'),r=m==='get'?s.get('h'):s.put(v,'h');r.onsuccess=()=>ok(r.result);r.onerror=()=>no()}});
+const norm=o=>({days:o.days||[],log:o.log||[],del:o.del||{}});
+
+function merge(o){
+  if(!o||!Array.isArray(o.days)||!Array.isArray(o.log))throw 0;
+  const before=JSON.stringify(S),del={...(o.del||{}),...S.del};
+  const dm=new Map(S.days.map(d=>[d.id,d]));
+  for(const d of o.days){const c=dm.get(d.id);if(!c||(d.u||0)>(c.u||0))dm.set(d.id,d)}
+  const lm=new Map(S.log.map(x=>[x.id,x]));
+  for(const x of o.log)if(!lm.has(x.id))lm.set(x.id,x);
+  S.del=del;S.days=[...dm.values()].filter(d=>!del[d.id]);
+  S.log=[...lm.values()].filter(x=>!del[x.id]).sort((a,b)=>b.date.localeCompare(a.date));
+  return JSON.stringify(S)!==before;
+}
+async function fsync(){
+  FOK=false;
+  if(!FH||(await FH.queryPermission({mode:'readwrite'}))!=='granted')return false;
+  const t=await (await FH.getFile()).text();let ch=false;
+  if(t.trim())ch=merge(JSON.parse(t));
+  const w=await FH.createWritable();await w.write(JSON.stringify(S));await w.close();
+  FOK=true;return ch;
+}
+function status(m){st(m||(FOK?'✓ Сохранено на устройстве и в файле «'+FH.name+'»':'✓ Сохранено на этом устройстве. Как перенести историю на другие устройства — вкладка «Данные».'))}
+function save(){
+  dirty=true;
+  try{localStorage.setItem('wl',JSON.stringify(S));localStorage.setItem('wd',JSON.stringify(DR))}catch(e){}
+  clearTimeout(tm);tm=setTimeout(async()=>{
+    try{if(await fsync())render()}catch(e){dirty=false;status('Файл не записан: данные сохранены только на этом устройстве');return}
+    dirty=false;status()},400);
+}
+async function load(){
+  try{const a=localStorage.getItem('wl');if(a)S=norm(JSON.parse(a));const b=localStorage.getItem('wd');if(b)DR=JSON.parse(b)}catch(e){}
+  tab=S.days.length?'work':'days';render();status();
+  try{FH=await idb('get');if(FH){if(await fsync())render();status();if(tab==='data')render()}}catch(e){}
+}
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState!=='visible'||!FH||dirty)return;
+  try{if(await fsync())render();status()}catch(e){}
+});
+async function fpick(a){
+  try{
+    if(a==='fnew')FH=await showSaveFilePicker({...FT,suggestedName:'trainings.json'});
+    else if(a==='fopen')[FH]=await showOpenFilePicker(FT);
+    await FH.requestPermission({mode:'readwrite'});
+    if(a!=='fconn')await idb('put',FH);
+    await fsync();save();status();
+  }catch(e){}
+  render();
+}
+function exp(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));
+  a.download='trainings-'+today()+'.json';document.body.appendChild(a);a.click();a.remove();
+}
+function vData(){
+  const fs=!FS?'<p class="mut">Автозапись в файл работает в Chrome и Edge на компьютере. В этом браузере переносите историю копиями (ниже).</p>'
+   :FH?(FOK?`<p>✓ Привязан файл «${esc(FH.name)}». Тренировки пишутся в него автоматически и подтягиваются из него при открытии.</p>`
+        :`<p>Файл «${esc(FH.name)}» привязан, нужно подтвердить доступ.</p><button class="pri" data-a="fconn">Подтвердить доступ</button>`)
+   :'<div class="row"><button class="pri" data-a="fnew">Создать файл истории</button><button data-a="fopen">Выбрать существующий</button></div>';
+  return `<section class="card"><h2>Автосинхронизация через файл</h2><p>Положите файл истории в папку, которую синхронизирует ваш облачный диск (Яндекс Диск, Dropbox, Syncthing и т. п.), и привяжите его на каждом компьютере. Записи с разных устройств объединяются без потерь.</p>${fs}</section>
+<section class="card"><h2>Копия вручную</h2><p>Работает на любом устройстве, в том числе на телефоне: скачайте копию, перенесите файл и загрузите его на другом устройстве. Новые тренировки добавятся к имеющимся, ничего не затирается.</p><div class="row"><button data-a="export">Скачать копию</button><label class="btn">Загрузить копию<input type="file" id="imp" accept=".json,application/json" hidden></label></div><p id="imsg" class="mut"></p></section>`;
+}
+const lastSets=n=>{for(const s of S.log){const e=s.ex.find(x=>x.name===n);if(e)return e.sets}return[]};
+
+function vDays(){
+  return `<div class="row"><input id="nd" placeholder="Новый день, например Pull"><button class="pri" data-a="addday">Добавить день</button></div>`+
+  (S.days.map(d=>`<section class="card" data-d="${d.id}"><div class="hd"><input class="ttl" data-f="dname" value="${esc(d.name)}"><button class="x" data-a="delday">Удалить</button></div>
+  ${d.ex.map(e=>`<div class="ex" data-e="${e.id}"><span class="nm">${esc(e.name)}</span><label class="mut">подходов <input type="number" min="1" max="20" data-f="esets" value="${e.sets}"></label><button class="x" data-a="delex">×</button></div>`).join('')}
+  <div class="row"><input list="sg" data-f="newname" placeholder="Упражнение"><input class="n" type="number" min="1" value="3" data-f="newsets" title="Подходов"><button data-a="addex">+ Добавить</button></div></section>`).join('')
+  ||'<p class="mut">Создайте первый тренировочный день, затем добавьте в него упражнения и число подходов.</p>');
+}
+
+function start(){
+  const d=S.days.find(x=>x.id===$('#sd').value);if(!d)return;
+  DR={name:d.name,date:$('#sdt').value||today(),ex:d.ex.map(e=>{const pv=lastSets(e.name);
+    return{name:e.name,sets:Array.from({length:e.sets},(_,i)=>{const p=pv[i]||pv[pv.length-1];return p?{w:''+p.w,r:''+p.r}:{w:'0',r:''}})}})};
+}
+function finish(){
+  const D=DR;
+  const ex=D.ex.map(e=>({name:e.name,sets:e.sets.map(s=>({w:+s.w||0,r:+s.r||0})).filter(s=>s.r>0)})).filter(e=>e.sets.length);
+  if(!ex.length)return;
+  S.log.unshift({id:uid(),date:D.date,name:D.name,ex});
+  S.log.sort((a,b)=>b.date.localeCompare(a.date));DR=null;tab='log';
+}
+
+function vWork(){
+  if(DR){const D=DR;
+    return `<section class="card"><div class="hd"><h2>${esc(D.name)} · ${fd(D.date)}</h2><button class="x" data-a="discard">Отменить</button></div>`+
+    D.ex.map((e,i)=>`<div class="exb"><h3>${esc(e.name)}</h3><div class="sh"><span></span><span>Доп. вес, кг</span><span>Повторы</span><span></span></div>`+
+      e.sets.map((s,j)=>`<div class="sr"><span class="mut">${j+1}</span><input type="number" inputmode="decimal" step="0.5" min="0" data-f="w" data-i="${i}" data-j="${j}" value="${esc(s.w)}"><input type="number" inputmode="numeric" min="0" data-f="r" data-i="${i}" data-j="${j}" value="${esc(s.r)}" placeholder="0"><button class="x" data-a="delset" data-i="${i}" data-j="${j}">×</button></div>`).join('')+
+      `<button class="ghost" data-a="addset" data-i="${i}">+ подход</button></div>`).join('')+
+    `<div class="row"><button class="pri" data-a="finish">Завершить и сохранить</button></div></section>`}
+  const ds=S.days.filter(d=>d.ex.length);
+  if(!ds.length)return '<p class="mut">Сначала создайте день с упражнениями на вкладке «Дни».</p>';
+  return `<section class="card"><h2>Начать тренировку</h2><div class="row"><select id="sd">${ds.map(d=>`<option value="${d.id}">${esc(d.name)}</option>`).join('')}</select><input type="date" id="sdt" value="${today()}"><button class="pri" data-a="start">Начать</button></div><p class="mut">Значения подставятся из прошлой тренировки — поправьте то, что изменилось. Для упражнений с собственным весом оставьте 0.</p></section>`;
+}
+
+function chart(){
+  const P=S.log.filter(s=>s.ex.some(e=>e.name===selEx)).reverse().map(s=>{const a=s.ex.find(e=>e.name===selEx).sets;
+    return{d:s.date,y:metric==='w'?Math.max(...a.map(x=>x.w)):a.reduce((t,x)=>t+(metric==='r'?x.r:x.w*x.r),0)}});
+  let lo=Math.min(...P.map(p=>p.y)),hi=Math.max(...P.map(p=>p.y));
+  if(lo===hi){lo=Math.max(0,lo-1);hi+=1}
+  const W=480,H=220,L=44,R=16,T=22,B=30;
+  const X=i=>L+(P.length>1?i*(W-L-R)/(P.length-1):(W-L-R)/2),Y=v=>T+(hi-v)*(H-T-B)/(hi-lo);
+  return `<svg viewBox="0 0 ${W} ${H}" class="ch" role="img" aria-label="График динамики"><line class="gl" x1="${L}" x2="${W-R}" y1="${Y(lo)}" y2="${Y(lo)}"/><line class="gl" x1="${L}" x2="${W-R}" y1="${Y(hi)}" y2="${Y(hi)}"/><text x="${L-6}" y="${Y(hi)+4}" text-anchor="end">${f1(hi)}</text><text x="${L-6}" y="${Y(lo)+4}" text-anchor="end">${f1(lo)}</text><polyline points="${P.map((p,i)=>X(i)+','+Y(p.y)).join(' ')}"/>${P.map((p,i)=>`<circle cx="${X(i)}" cy="${Y(p.y)}" r="4"><title>${p.d}: ${f1(p.y)}</title></circle>`).join('')}${P.length<=10?P.map((p,i)=>`<text class="v" x="${X(i)}" y="${Y(p.y)-9}" text-anchor="middle">${f1(p.y)}</text>`).join(''):''}<text x="${L}" y="${H-8}">${fd(P[0].d)}</text><text x="${W-R}" y="${H-8}" text-anchor="end">${fd(P[P.length-1].d)}</text></svg>`;
+}
+
+function vLog(){
+  const names=[...new Set(S.log.flatMap(s=>s.ex.map(e=>e.name)))];
+  if(!names.length)return '<p class="mut">Записей пока нет. После первой завершённой тренировки здесь появятся история и графики.</p>';
+  if(!names.includes(selEx))selEx=names[0];
+  const M={w:'Макс. доп. вес',r:'Повторения',v:'Объём (кг×повт)'};
+  return `<section class="card"><div class="hd"><h2>Динамика</h2><select data-f="selex">${names.map(n=>`<option${n===selEx?' selected':''}>${esc(n)}</option>`).join('')}</select></div><div class="seg">${Object.entries(M).map(([k,t])=>`<button data-a="metric" data-m="${k}" class="${k===metric?'on':''}">${t}</button>`).join('')}</div>${chart()}</section>`+
+  `<p class="mut">Подходы: доп. вес × повторы (без «+» — только повторы с собственным весом).</p>`+
+  S.log.map(s=>`<section class="card"><div class="hd"><h3>${s.date.split('-').reverse().join('.')} · ${esc(s.name)}</h3><button class="x" data-a="delsess" data-id="${s.id}">Удалить</button></div>${s.ex.map(e=>`<div class="ln"><b>${esc(e.name)}</b>: ${e.sets.map(x=>x.w>0?`+${x.w}×${x.r}`:x.r).join(' · ')}</div>`).join('')}</section>`).join('');
+}
+
+function render(){
+  const T={days:['Дни',vDays],work:['Тренировка',vWork],log:['Дневник',vLog],data:['Данные',vData]};
+  $('#app').innerHTML=`<nav>${Object.entries(T).map(([k,[t]])=>`<button data-a="tab" data-t="${k}" class="${k===tab?'on':''}">${t}</button>`).join('')}</nav>`+T[tab][1]();
+}
+
+function arm(b){if(b.dataset.arm)return true;b.dataset.arm=1;const o=b.textContent;b.textContent='Точно?';
+  setTimeout(()=>{if(b.isConnected){delete b.dataset.arm;b.textContent=o}},2500);return false}
+
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
+  const sec=b.closest('[data-d]'),d=sec&&S.days.find(x=>x.id===sec.dataset.d);
+  if(a==='tab')tab=b.dataset.t;
+  else if(a==='addday'){S.days.push({id:uid(),u:Date.now(),name:$('#nd').value.trim()||'День '+(S.days.length+1),ex:[]})}
+  else if(a==='delday'){if(!arm(b))return;S.del[d.id]=Date.now();S.days=S.days.filter(x=>x!==d)}
+  else if(a==='addex'){const nm=sec.querySelector('[data-f=newname]').value.trim();if(!nm)return;
+    d.ex.push({id:uid(),name:nm,sets:Math.max(1,+sec.querySelector('[data-f=newsets]').value||3)})}
+  else if(a==='delex'){const id=b.closest('[data-e]').dataset.e;d.ex=d.ex.filter(x=>x.id!==id)}
+  else if(a==='start')start();
+  else if(a==='addset'){const s=DR.ex[+b.dataset.i].sets;s.push({...(s[s.length-1]||{w:'0',r:''})})}
+  else if(a==='delset')DR.ex[+b.dataset.i].sets.splice(+b.dataset.j,1);
+  else if(a==='finish')finish();
+  else if(a==='discard'){if(!arm(b))return;DR=null}
+  else if(a==='delsess'){if(!arm(b))return;S.del[b.dataset.id]=Date.now();S.log=S.log.filter(x=>x.id!==b.dataset.id)}
+  else if(a==='export'){exp();return}
+  else if(['fnew','fopen','fconn'].includes(a)){fpick(a);return}
+  else if(a==='metric')metric=b.dataset.m;
+  if(d&&S.days.includes(d))d.u=Date.now();
+  save();render();
+});
+
+document.addEventListener('input',e=>{
+  const t=e.target,f=t.dataset.f;if(!f)return;const v=t.value;
+  const d=S.days.find(x=>x.id===(t.closest('[data-d]')||{dataset:{}}).dataset.d);
+  if(f==='dname'&&d)d.name=v;
+  else if(f==='esets'&&d){d.ex.find(x=>x.id===t.closest('[data-e]').dataset.e).sets=Math.max(1,+v||1)}
+  else if(f==='w'||f==='r')DR.ex[+t.dataset.i].sets[+t.dataset.j][f]=v;
+  else if(f==='selex'){selEx=v;render();return}
+  else return;
+  if(d)d.u=Date.now();
+  save();
+});
+document.addEventListener('change',e=>{
+  if(e.target.id!=='imp'||!e.target.files[0])return;
+  e.target.files[0].text().then(x=>{
+    const n=S.log.length;let m;
+    try{merge(norm(JSON.parse(x)));save();m='Готово. Тренировок в истории: '+S.log.length+' (добавлено '+(S.log.length-n)+').'}catch(err){m='Не удалось прочитать файл — нужна копия, скачанная из этого инструмента.'}
+    render();$('#imsg').textContent=m;
+  });
+});
+load();
+</script>
+</body>
+</html>
